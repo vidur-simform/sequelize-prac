@@ -1,6 +1,9 @@
 const Order = require("../models/order");
 const User = require("../models/user");
 const Product = require("../models/product");
+const { literal } = require("sequelize");
+const OrderDetail = require("../models/order-detail");
+const sequelize = require("../utils/dbSequelize");
 
 const randomDateGenerator = () => {
     const deliveryDate = new Date();
@@ -12,14 +15,13 @@ const randomDateGenerator = () => {
 exports.getOrders = async (req, res, next) => {
     try {
         const orders = await Order.findAll({
-        
-            attributes: ["id", "status", "expected_date",'user.name'],
+
+            attributes: ["id", "status", [literal(`DATE(order.createdAt)`), "order_date"], [literal(`DATEDIFF(expected_date, NOW())`), "expected_delivery_days"], [literal(`user.name`), "username"]],
             include: [
-                { attributes: ["user.name"] }
-                
+                { model: User, attributes: [] },
+                { model: Product, attributes: ["title", "price"], through: { attributes: [] } }
             ]
         });
-        orders
         res.status(200).json({
             message: "Fetched orders successfully.",
             orders: orders,
@@ -31,11 +33,21 @@ exports.getOrders = async (req, res, next) => {
         });
     }
 };
-exports.getOrder = async (req, res, next) => {
+
+exports.getUndeliveredOrders = async (req, res, next) => {
     try {
-        const orders = await Order.findAll({ include: User });
+        const orders = await Order.findAll({
+            attributes: ["id", [literal(`DATE(order.createdAt)`), "order_date"], [literal(`DATEDIFF(expected_date, NOW())`), "expected_delivery_days"], [literal(`user.name`), "username"]],
+            include: [
+                { model: User, attributes: [] },
+                { model: Product, attributes: ["title", "price"], through: { attributes: [] } }
+            ]
+            , where: {
+                status: "undelivered"
+            }
+        });
         res.status(200).json({
-            message: "Fetched orders successfully.",
+            message: "Fetched undelivered orders successfully.",
             orders: orders,
         });
     } catch (err) {
@@ -45,19 +57,105 @@ exports.getOrder = async (req, res, next) => {
         });
     }
 };
+
+exports.getMostrecentOrders = async (req, res, next) => {
+    const n = parseInt(req.params.n);
+    try {
+        const orders = await Order.findAll({
+            attributes: ["id", "createdAt", [literal(`DATE(order.createdAt)`), "order_date"], [literal(`DATEDIFF(expected_date, NOW())`), "expected_delivery_days"], [literal(`user.name`), "username"]],
+            include: [
+                { model: User, required: true, attributes: [] },
+                { model: Product, required: true, attributes: ["title", "price"], through: { attributes: [] } }
+            ],
+            order: literal('createdAt DESC'),
+            limit: n
+        });
+        res.status(200).json({
+            message: `Fetched most ${n} recent orders successfully.`,
+            orders: orders,
+        });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({
+            message: "Something went wrong!",
+        });
+    }
+};
+
 exports.createOrder = async (req, res, next) => {
-    const { userId, status, productId, quantity } = req.body;
+
+    const { userId, status, productIds, quantities } = req.body;
+    const pids = productIds.split(",");
+    const qs = quantities.split(",");
     try {
-        const order = await Order.create({
-            status: status,
-            userId: userId,
-            expected_date: randomDateGenerator(),
+        const result = await sequelize.transaction(async (t) => {
+            const order = await Order.create({
+                status: status,
+                userId: userId,
+                expected_date: randomDateGenerator(),
+            }, { transaction: t });
+
+            const oid = order.id;
+            const OrderDetailsArr = pids.map((pid, i) => {
+                return {
+                    productId: pid,
+                    orderId: oid,
+                    quantity: qs[i]
+                };
+            });
+
+            await OrderDetail.bulkCreate(OrderDetailsArr,{ transaction: t });
+            res.status(200).json({
+                message: "Order created successfully.",
+                order: order
+            });
+            return order;
         });
-        const prod = await Product.findByPk(productId);
-        await order.addProduct(prod, { through: { quantity: quantity } });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({
+            message: "Something went wrong!",
+        });
+    }
+};
+
+exports.getMostExpensiveOrder = async (req, res, next) => {
+    try {
+        const orders = await OrderDetail.findAll({
+            attributes: ["orderId", [literal("SUM(quantity*product.price)"), "total_cost"]],
+            group: ["orderId"],
+            include: [
+                { model: Product, as: "product", attributes: [] }
+            ],
+            order: [["total_cost", "DESC"]],
+            limit: 1
+        });
         res.status(200).json({
-            message: "Order created successfully.",
-            order: order,
+            message: "Fetched most expensive order successfully.",
+            order: orders[0]
+        });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({
+            message: "Something went wrong!",
+        });
+    }
+};
+
+exports.getCheapestOrder = async (req, res, next) => {
+    try {
+        const orders = await OrderDetail.findAll({
+            attributes: ["orderId", [literal("SUM(quantity*product.price)"), "total_cost"]],
+            group: ["orderId"],
+            include: [
+                { model: Product, as: "product", attributes: [] }
+            ],
+            order: [["total_cost", "ASC"]],
+            limit: 1
+        });
+        res.status(200).json({
+            message: "Fetched cheapest order successfully.",
+            order: orders[0]
         });
     } catch (err) {
         console.log(err);

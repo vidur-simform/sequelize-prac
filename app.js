@@ -15,17 +15,20 @@ Order.belongsTo(User);
 Product.belongsToMany(Order,{ through: OrderDetail });
 Order.belongsToMany(Product,{ through: OrderDetail });
 
+Product.hasMany(OrderDetail);
+OrderDetail.belongsTo(Product);
+Order.hasMany(OrderDetail);
+OrderDetail.belongsTo(Order);
+
 const userRoutes = require('./routes/user');
 const productRoutes = require('./routes/product');
 const orderRoutes = require('./routes/order');
-const summaryRoutes = require('./routes/summary');
 
 app.use(express.urlencoded());
 app.use(cors());
 app.use('/user', userRoutes);
 app.use('/product', productRoutes);
 app.use('/order', orderRoutes);
-app.use('/summary', summaryRoutes);
 
 (async () => {
   try {
