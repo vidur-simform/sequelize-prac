@@ -37,7 +37,9 @@ exports.getOrders = async (req, res, next) => {
 exports.getUndeliveredOrders = async (req, res, next) => {
     try {
         const orders = await Order.findAll({
-            attributes: ["id", [literal(`DATE(order.createdAt)`), "order_date"], [literal(`DATEDIFF(expected_date, NOW())`), "expected_delivery_days"], [literal(`user.name`), "username"]],
+            attributes: ["id", [literal(`DATE(order.createdAt)`), "order_date"], 
+            [literal(`DATEDIFF(expected_date, NOW())`), "expected_delivery_days"], 
+            [literal(`user.name`), "username"]],
             include: [
                 { model: User, attributes: [] },
                 { model: Product, attributes: ["title", "price"], through: { attributes: [] } }
@@ -62,10 +64,13 @@ exports.getMostrecentOrders = async (req, res, next) => {
     const n = parseInt(req.params.n);
     try {
         const orders = await Order.findAll({
-            attributes: ["id", "createdAt", [literal(`DATE(order.createdAt)`), "order_date"], [literal(`DATEDIFF(expected_date, NOW())`), "expected_delivery_days"], [literal(`user.name`), "username"]],
+            attributes: ["id", "createdAt", [literal(`DATE(order.createdAt)`), "order_date"], 
+            [literal(`DATEDIFF(expected_date, NOW())`), "expected_delivery_days"], 
+            [literal(`user.name`), "username"]],
             include: [
                 { model: User, required: true, attributes: [] },
-                { model: Product, required: true, attributes: ["title", "price"], through: { attributes: [] } }
+                { model: Product, required: true, attributes: ["title", "price"], 
+                through: { attributes: [] } }
             ],
             order: literal('createdAt DESC'),
             limit: n

@@ -12,28 +12,6 @@ exports.createUser = async (req, res, next) => {
             message: 'User created successfully.',
             user: user
         });
-        // const users = await User.bulkCreate([
-        //     {
-        //         name: "Vidur",
-        //         email: "vidur@abc.com"
-        //     },
-        //     {
-        //         name: "Harsh",
-        //         email: "harsh@abc.com"
-        //     },
-        //     {
-        //         name: "Raj",
-        //         email: "raj@abc.com"
-        //     },
-        //     {
-        //         name: "Utsav",
-        //         email: "utsav@abc.com"
-        //     }
-        // ]);
-        // res.status(200).json({
-        //     message: 'Temp Users created successfully.',
-        //     // user: user
-        // });
     }
     catch (err) {
         console.log(err);
